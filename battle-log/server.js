@@ -10,7 +10,7 @@ function validateParty(input){
   const members=input.members.map(m=>{
     if(!m || typeof m.name!=='string' || !m.name.trim() || m.name.length>100)throw new Error('ポケモン名を確認してください。');
     const member={name:m.name.trim()};
-    for(const [key,max] of [['details',2000],['item',100],['nature',30]]){const v=m[key]??'';if(typeof v!=='string'||v.length>max)throw new Error('持ち物・性格・旧メモを確認してください。');member[key]=v.trim();}
+    for(const [key,max] of [['details',2000],['item',100],['ability',100],['nature',30]]){const v=m[key]??'';if(typeof v!=='string'||v.length>max)throw new Error('持ち物・特性・性格・旧メモを確認してください。');member[key]=v.trim();}
     const stats=['hp','atk','def','spa','spd','spe'];member.sp={};
     for(const key of stats){const value=m.sp?.[key]??0;if(!Number.isInteger(value)||value<0||value>32)throw new Error('配分は各能力0〜32の整数で入力してください。');member.sp[key]=value;}
     if(Object.values(member.sp).reduce((a,b)=>a+b,0)>66)throw new Error('配分の合計は66以下にしてください。');

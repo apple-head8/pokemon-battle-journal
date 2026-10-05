@@ -38,7 +38,7 @@ test('保存・再起動・編集・重複読み込み・入力検証・削除',
     const restored=await(await fetch(url+'/api/records')).json();
     assert.deepEqual(restored.parties.find(p=>p.id===party.id).members.map(m=>({name:m.name,details:m.details})),reordered.members);
     const structured=structuredClone(restored.parties.find(p=>p.id===party.id));
-    structured.members[0].item='のろいのおふだ';structured.members[0].nature='いじっぱり';structured.members[0].sp={hp:6,atk:32,def:0,spa:0,spd:0,spe:28};structured.members[0].moves=['おはかまいり','ウェーブタックル','アクアジェット','こうそくいどう'];
+    structured.members[0].item='のろいのおふだ';structured.members[0].ability='てきおうりょく';structured.members[0].nature='いじっぱり';structured.members[0].sp={hp:6,atk:32,def:0,spa:0,spd:0,spe:28};structured.members[0].moves=['おはかまいり','ウェーブタックル','アクアジェット','こうそくいどう'];
     assert.equal((await post('parties',structured)).status,200);
     let stored=(await(await fetch(url+'/api/records')).json());
     assert.deepEqual(stored.parties.find(p=>p.id===party.id).members[0],structured.members[0]);

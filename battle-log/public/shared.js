@@ -14,5 +14,5 @@ window.addEventListener('storage',event=>{if(event.key==='battle-color-theme')ap
 function formatPartyMember(member){
   const stats=['hp','atk','def','spa','spd','spe'];const labels=['H','A','B','C','D','S'];
   const distribution=stats.map((s,i)=>member.sp?.[s]?labels[i]+member.sp[s]:'').filter(Boolean).join(' ');
-  return [member.name,member.item?'＠'+member.item:'',member.nature,distribution,member.moves?.filter(Boolean).join(' / '),member.details?'旧メモ：'+member.details:''].filter(Boolean).join(' · ');
+  return [member.name,member.item?'＠'+member.item:'',member.ability?'特性：'+member.ability:'',member.nature,distribution,member.moves?.filter(Boolean).join(' / '),member.details?'旧メモ：'+member.details:''].filter(Boolean).join(' · ');
 }
