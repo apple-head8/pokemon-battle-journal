@@ -17,6 +17,16 @@ test('保存・再起動・編集・重複読み込み・入力検証・削除',
     await new Promise(r=>server.close(r));server=createServer({dataDir:dir});url=await start();
     let saved=await(await fetch(url+'/api/records')).json();assert.equal(saved.records[0].notes,'1T\n2T');
     const original=saved.records[0].createdAt;
+    const turns=['こちら：壁\n相手：ステロ','','こちら：てっていこうせん'];
+    assert.equal((await post('records',{...sample,turns})).status,200);
+    await new Promise(r=>server.close(r));server=createServer({dataDir:dir});url=await start();
+    const turnRecord=(await(await fetch(url+'/api/records')).json()).records[0];
+    assert.deepEqual(turnRecord.turns,turns);assert.equal(turnRecord.notes,sample.notes);
+    assert.equal((await post('import',{version:1,records:[{...turnRecord,id:'turn-import'}]})).status,200);
+    assert.deepEqual((await(await fetch(url+'/api/records')).json()).records.find(r=>r.id==='turn-import').turns,turns);
+    await post('delete',{id:'turn-import'});
+    for(const invalid of ['bad',[null],Array(101).fill(''),['x'.repeat(2001)],Array(11).fill('x'.repeat(2000))])assert.equal((await post('records',{...sample,turns:invalid})).status,400);
+    assert.deepEqual((await(await fetch(url+'/api/records')).json()).records[0].turns,turns);
     saved=await(await post('records',{...sample,result:'loss'})).json();assert.equal(saved.records.length,1);assert.equal(saved.records[0].result,'loss');assert.equal(saved.records[0].createdAt,original);
     saved=await(await post('import',{version:1,records:[sample,{...sample,id:'test-2'}]})).json();assert.equal(saved.records.length,2);assert.equal(saved.records[0].result,'loss');
     assert.equal((await post('records',{...sample,date:'2026-02-31'})).status,400);

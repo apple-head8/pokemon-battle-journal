@@ -26,6 +26,10 @@ function validateParty(input){
 function validate(input) {
   if (!input || typeof input !== 'object') throw new Error('記録の形式が正しくありません。');
   const out = {};
+  if(input.turns!==undefined){
+    if(!Array.isArray(input.turns)||input.turns.length>100||input.turns.some(v=>typeof v!=='string'||v.length>2000)||input.turns.join('').length>20000)throw new Error('ターンメモは100ターン以内、各2000文字・合計20000文字以内で入力してください。');
+    out.turns=input.turns.map(v=>v.trim());
+  }
   for (const [key, max] of Object.entries(fields)) {
     if (typeof input[key] !== 'string' || input[key].length > max) throw new Error(`${key} の入力を確認してください。`);
     out[key] = input[key].trim();
