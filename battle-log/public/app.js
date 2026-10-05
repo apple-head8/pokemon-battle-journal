@@ -2,20 +2,39 @@ const $=id=>document.getElementById(id);
 let records=[];let parties=[];let activeSnapshot=null;let ready=false;let pending=false;
 const labels={win:'勝ち',loss:'負け',draw:'引き分け',rocks:{yes:'ステロあり',prevented:'ステロ阻止',none:'ステロなし'},setup:{yes:'積む機会あり',no:'積む機会なし',unused:'積まずに展開'}};
 for(const [container,prefix,count,list] of [['opponents','op',6,''],['ownSelection','own',3,'ownNames'],['enemySelection','enemy',3,'']]){
-  for(let i=0;i<count;i++){const input=document.createElement(prefix==='own'?'select':'input');input.id=prefix+i;input.maxLength=100;input.placeholder=i===0&&count===3?'先発':`${i+1}匹目`;input.setAttribute('aria-label',`${container==='opponents'?'相手パーティ':container==='ownSelection'?'こちらの選出':'相手の選出'} ${i+1}匹目`);$(container).append(input);}
+  for(let i=0;i<count;i++){const input=document.createElement(prefix==='op'?'input':'select');input.id=prefix+i;input.maxLength=100;input.placeholder=i===0&&count===3?'先発':`${i+1}匹目`;input.setAttribute('aria-label',`${container==='opponents'?'相手パーティ':container==='ownSelection'?'こちらの選出':'相手の選出'} ${i+1}匹目`);$(container).append(input);}
 }
 function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function notice(message){$('notice').textContent=message;$('notice').classList.add('show');clearTimeout(notice.timer);notice.timer=setTimeout(()=>$('notice').classList.remove('show'),6000);}
 async function api(path,body){const res=await fetch('/api/'+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});const data=await res.json();if(!res.ok)throw new Error(data.error||'通信に失敗しました。');return data;}
 function getForm(){const data={id:$('recordId').value||crypto.randomUUID(),result:document.querySelector('[name=result]:checked')?.value||''};for(const key of ['team','date','rocks','setup','leadWork','review'])data[key]=$(key).value;for(const [key,prefix,n] of [['opponents','op',6],['own','own',3],['enemy','enemy',3]])data[key]=Array.from({length:n},(_,i)=>$(prefix+i).value);const party=activeSnapshot||parties.find(p=>p.name===data.team);if(party)data.partySnapshot=party;data.turns=readTurns();data.notes='';return data;}
-function fill(data){$('review').value=reviewText(data);setTurns(data.turns||[]);const editing=records.some(r=>r.id===data.id);$('recordId').value=data.id||'';activeSnapshot=editing?data.partySnapshot||null:null;refreshTeams(data.team,editing);for(const key of ['date','rocks','setup','leadWork'])if(data[key]!==undefined)$(key).value=data[key];for(const node of document.querySelectorAll('[name=result]'))node.checked=node.value===data.result;refreshOwn(data.team===$('team').value?data.own||['','','']:['','',''],editing);for(const [key,prefix]of [['opponents','op'],['enemy','enemy']])(data[key]||[]).forEach((v,i)=>$(prefix+i).value=v);$('formTitle').textContent=editing?'対戦を編集':'対戦を記録';}
+function fill(data){$('review').value=reviewText(data);setTurns(data.turns||[]);const editing=records.some(r=>r.id===data.id);$('recordId').value=data.id||'';activeSnapshot=editing?data.partySnapshot||null:null;refreshTeams(data.team,editing);for(const key of ['date','rocks','setup','leadWork'])if(data[key]!==undefined)$(key).value=data[key];for(const node of document.querySelectorAll('[name=result]'))node.checked=node.value===data.result;refreshOwn(data.team===$('team').value?data.own||['','','']:['','',''],editing);for(let i=0;i<6;i++)$('op'+i).value=data.opponents?.[i]||'';refreshEnemy(data.enemy||['','',''],true);$('formTitle').textContent=editing?'対戦を編集':'対戦を記録';}
 function draft(){try{localStorage.setItem('battle-note-draft',JSON.stringify(getForm()));}catch{}}
-function reset(){setTurns([]);const team=$('team').value;HTMLFormElement.prototype.reset.call($('battleForm'));activeSnapshot=null;refreshTeams(team);refreshOwn(['','','']);$('date').value=today();$('recordId').value='';$('formTitle').textContent='対戦を記録';try{localStorage.removeItem('battle-note-draft');}catch{}}
+function reset(){setTurns([]);const team=$('team').value;HTMLFormElement.prototype.reset.call($('battleForm'));activeSnapshot=null;refreshTeams(team);refreshOwn(['','','']);refreshEnemy(['','','']);$('date').value=today();$('recordId').value='';$('formTitle').textContent='対戦を記録';try{localStorage.removeItem('battle-note-draft');}catch{}}
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
 let removedTurn=null;
 function readTurns(){return Array.from(document.querySelectorAll('#turns textarea'),node=>node.value);}
 function battleNotes(record){return [...(record.turns||[]).map((text,i)=>text.trim()?`${i+1}T\n${text}`:'').filter(Boolean)].filter(Boolean).join('\n\n');}
 function reviewText(record){return [record.notes,record.review].filter(Boolean).join('\n\n');}
+let previousOpponentNames=[];
+function refreshEnemy(values=Array.from({length:3},(_,i)=>$('enemy'+i).value),keepLegacy=false){
+  const names=Array.from({length:6},(_,i)=>$('op'+i).value.trim());
+  for(let i=0;i<3;i++){
+    const select=$('enemy'+i);
+    select.replaceChildren(new Option(names.some(Boolean)?(i===0?'先発を選択':`${i+1}匹目を選択`):'相手の6匹を入力してください',''));
+    for(const name of [...new Set(names.filter(Boolean))])select.add(new Option(name,name));
+    if(keepLegacy&&values[i]&&!names.includes(values[i]))select.add(new Option(values[i]+'（以前の入力）',values[i]));
+    select.value=names.includes(values[i])||keepLegacy?values[i]||'':'';
+  }
+  previousOpponentNames=names;
+}
+$('opponents').addEventListener('input',()=>{
+  const values=Array.from({length:3},(_,i)=>$('enemy'+i).value);
+  const names=Array.from({length:6},(_,i)=>$('op'+i).value.trim());
+  // Follow corrections in the same team slot, without losing old free-text records.
+  const corrected=values.map(value=>{const slot=previousOpponentNames.indexOf(value);return value&&slot>=0?names[slot]:value;});
+  refreshEnemy(corrected,true);
+});
 function setTurns(values){removedTurn=null;$('undoTurn').hidden=true;renderTurns(values.length?values:['']);}
 function renderTurns(values){
   $('turns').replaceChildren();
@@ -46,7 +65,7 @@ function render(){
 }
 function isDirty(){return Boolean(readTurns().some(v=>v.trim())||document.querySelector('[name=result]:checked')||$('leadWork').value||$('review').value||Array.from(document.querySelectorAll('.six input,.three input,.three select')).some(i=>i.value));}
 $('battleForm').addEventListener('input',draft);$('battleForm').addEventListener('change',draft);
-$('battleForm').onsubmit=async e=>{e.preventDefault();if(!ready||pending)return;const data=getForm();const own=data.own.filter(Boolean);if(new Set(own).size!==own.length)return notice('こちらの選出に同じポケモンが重複しています。');pending=true;$('save').disabled=true;$('recordId').value=data.id;draft();try{records=(await api('records',data)).records;reset();render();notice('対戦をファイルに保存しました。');}catch(error){notice(error.message);}finally{pending=false;$('save').disabled=false;}};
+$('battleForm').onsubmit=async e=>{e.preventDefault();if(!ready||pending)return;const data=getForm();const own=data.own.filter(Boolean);if(new Set(own).size!==own.length)return notice('こちらの選出に同じポケモンが重複しています。');const enemy=data.enemy.filter(Boolean);if(new Set(enemy).size!==enemy.length)return notice('相手の選出に同じポケモンが重複しています。');pending=true;$('save').disabled=true;$('recordId').value=data.id;draft();try{records=(await api('records',data)).records;reset();render();notice('対戦をファイルに保存しました。');}catch(error){notice(error.message);}finally{pending=false;$('save').disabled=false;}};
 $('reset').onclick=()=>{if(isDirty()&&!confirm('入力中の内容をクリアしますか？'))return;reset();};
 for(const id of ['filterTeam','filterResult'])$(id).onchange=render;
 function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type}));const a=el('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -56,7 +75,7 @@ $('import').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(p
 function refreshTeams(selected,allowHistorical=false){const active=parties.filter(p=>!p.archived);$('team').replaceChildren();for(const p of active)$('team').add(new Option(p.name,p.name));if(allowHistorical&&selected&&!active.some(p=>p.name===selected))$('team').add(new Option(selected+'（過去の記録）',selected));if(selected&&(allowHistorical||active.some(p=>p.name===selected)))$('team').value=selected;if(!$('team').options.length)$('team').add(new Option('パーティー管理で登録・復帰してください',''));}
 function refreshOwn(values=Array.from({length:3},(_,i)=>$('own'+i).value),keepLegacy=false){const party=activeSnapshot||parties.find(p=>p.name===$('team').value);const names=(party?.members||[]).map(m=>m.name);$('teamNote').textContent=names.length?names.map((n,i)=>`${i+1}. ${n}`).join(' / '):'この構築は未登録です。パーティーを登録してください。';for(let i=0;i<3;i++){const select=$('own'+i);select.replaceChildren(new Option(i===0?'先発を選択':'裏'+i+'を選択',''));for(const name of names)select.add(new Option(name,name));if(keepLegacy&&values[i]&&!names.includes(values[i]))select.add(new Option(values[i]+'（記録当時）',values[i]));select.value=names.includes(values[i])||keepLegacy?values[i]||'':'';}}
 $('team').onchange=()=>{activeSnapshot=null;refreshOwn();draft();};
-async function init(){setTurns([]);$('date').value=today();$('save').disabled=true;try{const result=await api('records');records=result.records;parties=result.parties||[];refreshTeams();refreshOwn(['','','']);ready=true;$('storage').textContent='● このPCにファイル保存';try{const saved=JSON.parse(localStorage.getItem('battle-note-draft'));if(saved)fill(saved);}catch{}render();$('save').disabled=false;}catch(error){$('storage').textContent='保存先に接続できません';$('records').append(el('p','起動スクリプトを開いてから、このページを再読み込みしてください。'));notice(error.message);}}
+async function init(){setTurns([]);$('date').value=today();$('save').disabled=true;try{const result=await api('records');records=result.records;parties=result.parties||[];refreshTeams();refreshOwn(['','','']);refreshEnemy(['','','']);ready=true;$('storage').textContent='● このPCにファイル保存';try{const saved=JSON.parse(localStorage.getItem('battle-note-draft'));if(saved)fill(saved);}catch{}render();$('save').disabled=false;}catch(error){$('storage').textContent='保存先に接続できません';$('records').append(el('p','起動スクリプトを開いてから、このページを再読み込みしてください。'));notice(error.message);}}
 init();
 // A page restored by browser Back must reflect party edits made on the other page.
 window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});

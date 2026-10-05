@@ -4,6 +4,27 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {createServer}=require('./server');
+test('相手の選出候補は6匹の順で更新され、旧入力も保持できる',()=>{
+  const vm=require('node:vm');
+  const source=fs.readFileSync(path.join(__dirname,'public/app.js'),'utf8');
+  const nodes={};
+  for(let i=0;i<6;i++)nodes['op'+i]={value:['アシレーヌ','ガブリアス','ボーマンダ','','',''][i]};
+  for(let i=0;i<3;i++)nodes['enemy'+i]={value:'',options:[],replaceChildren(option){this.options=[option];},add(option){this.options.push(option);}};
+  const context=vm.createContext({$:id=>nodes[id],Option:function(text,value){this.text=text;this.value=value;}});
+  const code=source.slice(source.indexOf('let previousOpponentNames='),source.indexOf("$('opponents').addEventListener"));
+  vm.runInContext(code,context);
+  vm.runInContext("refreshEnemy(['ボーマンダ','',''])",context);
+  assert.deepEqual(nodes.enemy0.options.map(o=>o.value),['','アシレーヌ','ガブリアス','ボーマンダ']);
+  assert.equal(nodes.enemy0.value,'ボーマンダ');
+  nodes.op1.value='アシレーヌ';
+  vm.runInContext("refreshEnemy(['旧メモ','',''],true)",context);
+  assert.deepEqual(nodes.enemy0.options.map(o=>o.value),['','アシレーヌ','ボーマンダ','旧メモ']);
+  assert.equal(nodes.enemy0.value,'旧メモ');
+  for(let i=0;i<6;i++)nodes['op'+i].value='';
+  vm.runInContext("refreshEnemy(['','',''])",context);
+  assert.deepEqual(nodes.enemy0.options.map(o=>o.value),['']);
+  assert.equal(nodes.enemy0.value,'');
+});
 test('旧補足メモと振り返りを欠落・重複なく統合できる',()=>{
   const vm=require('node:vm');
   const source=fs.readFileSync(path.join(__dirname,'public/app.js'),'utf8');
