@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const ROOT = path.join(__dirname, 'public');
-const fields = {team:150,date:10,leadWork:500,notes:20000,review:10000};
+const fields = {team:150,date:10,leadWork:500,notes:20000,review:30002};
 const defaultParty={id:'default-v2',name:'V2｜マスカーニャ入り',members:['カバルドン','ルカリオ','カイリュー','マスカーニャ','リザードンX','イダイトウ'].map(name=>({name,details:''}))};
 function validateParty(input){
   if(!input || typeof input.name!=='string' || !input.name.trim() || input.name.length>150 || !Array.isArray(input.members) || input.members.length!==6) throw new Error('パーティー名と6匹を入力してください。');

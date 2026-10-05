@@ -4,6 +4,17 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {createServer}=require('./server');
+test('旧補足メモと振り返りを欠落・重複なく統合できる',()=>{
+  const vm=require('node:vm');
+  const source=fs.readFileSync(path.join(__dirname,'public/app.js'),'utf8');
+  const reviewText=vm.runInNewContext('('+source.match(/^function reviewText\(record\).*$/m)[0]+')');
+  const legacy={notes:'旧対戦メモ\n2行目',review:'振り返り'};
+  const merged=reviewText(legacy);
+  assert.equal(merged,'旧対戦メモ\n2行目\n\n振り返り');
+  assert.equal(reviewText({notes:'',review:merged}),merged);
+  assert.equal(reviewText({notes:'補足のみ'}),'補足のみ');
+  assert.equal(reviewText({}), '');
+});
 test('保存・再起動・編集・重複読み込み・入力検証・削除',async()=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'battle-note-test-'));
   let server=createServer({dataDir:dir});
@@ -13,6 +24,9 @@ test('保存・再起動・編集・重複読み込み・入力検証・削除',
   const sample={id:'test-1',team:'検証用',date:'2026-10-05',result:'win',opponents:['アシレーヌ','','','','',''],own:['マスカーニャ','ルカリオ','イダイトウ'],enemy:['アシレーヌ','',''],rocks:'none',setup:'yes',leadWork:'初手の仕事',notes:'1T\n2T',review:'検証'};
   try{
     assert.equal((await fetch(url)).status,200);
+    assert.equal((await post('records',sample)).status,200);
+    assert.equal((await post('records',{...sample,notes:'',review:'a'.repeat(20000)+'\n\n'+'b'.repeat(10000)})).status,200);
+    assert.equal((await post('records',{...sample,review:'x'.repeat(30003)})).status,400);
     assert.equal((await post('records',sample)).status,200);
     await new Promise(r=>server.close(r));server=createServer({dataDir:dir});url=await start();
     let saved=await(await fetch(url+'/api/records')).json();assert.equal(saved.records[0].notes,'1T\n2T');
