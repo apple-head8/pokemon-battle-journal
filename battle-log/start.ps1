@@ -1,4 +1,15 @@
 $ErrorActionPreference = 'Stop'
+if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'public/build/parties.js'))) {
+  Push-Location $PSScriptRoot
+  try {
+    if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'node_modules'))) {
+      & npm.cmd ci --no-fund
+      if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
+    }
+    & npm.cmd run build
+    if ($LASTEXITCODE -ne 0) { throw 'React build failed.' }
+  } finally { Pop-Location }
+}
 $battleUrl = 'http://127.0.0.1:4318'
 try {
   Invoke-RestMethod "$battleUrl/api/records" -TimeoutSec 1 | Out-Null

@@ -1,0 +1,13 @@
+{
+  "name": "pokemon-battle-journal",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "start": "node server.js",
+    "test": "node --test server.test.js"
+  },
+  "dependencies": { "react": "^19.2.0", "react-dom": "^19.2.0" },
+  "devDependencies": { "vite": "^6.4.1" },
+  "engines": { "node": ">=20.12" }
+}

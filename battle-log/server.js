@@ -7,10 +7,21 @@ const fields = {team:150,date:10,leadWork:500,notes:20000,review:10000};
 const defaultParty={id:'default-v2',name:'V2｜マスカーニャ入り',members:['カバルドン','ルカリオ','カイリュー','マスカーニャ','リザードンX','イダイトウ'].map(name=>({name,details:''}))};
 function validateParty(input){
   if(!input || typeof input.name!=='string' || !input.name.trim() || input.name.length>150 || !Array.isArray(input.members) || input.members.length!==6) throw new Error('パーティー名と6匹を入力してください。');
-  const members=input.members.map(m=>{if(!m || typeof m.name!=='string' || !m.name.trim() || m.name.length>100 || typeof m.details!=='string' || m.details.length>2000)throw new Error('ポケモン名・型メモを確認してください。');return {name:m.name.trim(),details:m.details.trim()};});
+  const members=input.members.map(m=>{
+    if(!m || typeof m.name!=='string' || !m.name.trim() || m.name.length>100)throw new Error('ポケモン名を確認してください。');
+    const member={name:m.name.trim()};
+    for(const [key,max] of [['details',2000],['item',100],['nature',30]]){const v=m[key]??'';if(typeof v!=='string'||v.length>max)throw new Error('持ち物・性格・旧メモを確認してください。');member[key]=v.trim();}
+    const stats=['hp','atk','def','spa','spd','spe'];member.sp={};
+    for(const key of stats){const value=m.sp?.[key]??0;if(!Number.isInteger(value)||value<0||value>32)throw new Error('配分は各能力0〜32の整数で入力してください。');member.sp[key]=value;}
+    if(Object.values(member.sp).reduce((a,b)=>a+b,0)>66)throw new Error('配分の合計は66以下にしてください。');
+    member.moves=m.moves??['','','',''];if(!Array.isArray(member.moves)||member.moves.length!==4||member.moves.some(v=>typeof v!=='string'||v.length>100))throw new Error('技は4枠で入力してください。');member.moves=member.moves.map(v=>v.trim());
+    const filled=member.moves.filter(Boolean);if(new Set(filled).size!==filled.length)throw new Error('同じ技が重複しています。');
+    return member;
+  });
   if(new Set(members.map(m=>m.name)).size!==6)throw new Error('同じ名前が重複しています。');
   if(input.id && !/^[a-zA-Z0-9-]{1,80}$/.test(input.id))throw new Error('パーティーIDが正しくありません。');
-  return {id:input.id||crypto.randomUUID(),name:input.name.trim(),members};
+  if(input.archived!==undefined && typeof input.archived!=='boolean')throw new Error('パーティーの状態が正しくありません。');
+  return {id:input.id||crypto.randomUUID(),name:input.name.trim(),members,archived:input.archived??false};
 }
 function validate(input) {
   if (!input || typeof input !== 'object') throw new Error('記録の形式が正しくありません。');
@@ -38,7 +49,7 @@ function validate(input) {
 function createServer({dataDir=path.join(__dirname,'data')}={}) {
   fs.mkdirSync(dataDir,{recursive:true});
   const file=path.join(dataDir,'battles.json');
-  const read=()=>{const data=fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{version:1,records:[]};return {...data,parties:data.parties??[defaultParty]};};
+  const read=()=>{const data=fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{version:1,records:[]};return {...data,parties:(data.parties??[defaultParty]).map(validateParty)};};
   const initial=read();
   if(initial.version!==1 || !Array.isArray(initial.records)) throw new Error('保存ファイルを読み込めません。元ファイルを保持して停止しました。');
   initial.records.forEach(validate);
@@ -59,17 +70,24 @@ function createServer({dataDir=path.join(__dirname,'data')}={}) {
     const url=new URL(req.url,`http://${expected}`);
     try{
       if(req.method==='GET' && url.pathname==='/api/records') return json(200,read());
-      if(req.method==='POST' && ['/api/records','/api/import','/api/delete','/api/parties'].includes(url.pathname)) {
+      if(req.method==='POST' && ['/api/records','/api/import','/api/delete','/api/parties','/api/party-status'].includes(url.pathname)) {
         if(!req.headers['content-type']?.startsWith('application/json')) return json(415,{error:'JSON形式で送信してください。'});
         let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>5_000_000) return json(413,{error:'ファイルが大きすぎます（上限5MB）。'});}
         let input;try{input=JSON.parse(body);}catch{return json(400,{error:'JSONを読み込めません。'});}
         let {records,parties}=read();
-        if(url.pathname==='/api/parties'){
+        if(url.pathname==='/api/party-status'){
+          const party=parties.find(p=>p.id===input.id);
+          if(!party)return json(404,{error:'パーティーが見つかりません。'});
+          if(typeof input.archived!=='boolean')throw new Error('パーティーの状態が正しくありません。');
+          party.archived=input.archived;
+        }else if(url.pathname==='/api/parties'){
           const party=validateParty(input);
           if(parties.some(p=>p.name===party.name && p.id!==party.id))return json(400,{error:'同じパーティー名が登録済みです。別の名前にしてください。'});
           const index=parties.findIndex(p=>p.id===party.id);if(index<0)parties.push(party);else parties[index]=party;
         }else if(url.pathname==='/api/records'){
           const record=validate(input);const old=records.find(r=>r.id===record.id);
+          const selectedParty=parties.find(p=>record.partySnapshot?p.id===record.partySnapshot.id:p.name===record.team);
+          if(!old && selectedParty?.archived)return json(400,{error:'没にしたパーティーです。復帰させるか、使用構築を変更してください。'});
           if(old) record.createdAt=old.createdAt;
           records=records.filter(r=>r.id!==record.id);records.push(record);
         }else if(url.pathname==='/api/delete'){
@@ -86,8 +104,10 @@ function createServer({dataDir=path.join(__dirname,'data')}={}) {
         write(records,parties);return json(200,{version:1,records,parties});
       }
       if(req.method!=='GET') return json(405,{error:'操作できません。'});
-      const assets={'/':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css'],'/theme.css':['theme.css','text/css']};
-      const asset=assets[url.pathname];if(!asset) return json(404,{error:'見つかりません。'});
+      const assets={'/':['index.html','text/html'],'/parties':['parties.html','text/html'],'/shared.js':['shared.js','text/javascript'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css'],'/theme.css':['theme.css','text/css'],'/management.css':['management.css','text/css']};
+      let asset=assets[url.pathname];
+      if(/^\/build\/[a-zA-Z0-9_.-]+\.js$/.test(url.pathname))asset=[url.pathname.slice(1),'text/javascript'];
+      if(!asset || !fs.existsSync(path.join(ROOT,asset[0]))) return json(404,{error:'見つかりません。'});
       res.writeHead(200,{'Content-Type':asset[1]+'; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"});
       res.end(fs.readFileSync(path.join(ROOT,asset[0])));
     }catch(error){console.error(error.message);json(400,{error:'保存・読み込みに失敗しました。入力は残っています。'+error.message});}
