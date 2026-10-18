@@ -1,3 +1,4 @@
+window.journalAPI=async function(path,body){const res=await fetch('/api/'+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});const data=await res.json();if(!res.ok)throw new Error(data.error||'保存できませんでした。');return data;};
 // Shared appearance and display helpers for the journal and party editor.
 function applyColorTheme(theme){
   document.documentElement.dataset.theme=theme;

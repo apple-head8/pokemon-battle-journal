@@ -45,6 +45,9 @@ test('保存・再起動・編集・重複読み込み・入力検証・削除',
   const sample={id:'test-1',team:'検証用',date:'2026-10-05',result:'win',opponents:['アシレーヌ','','','','',''],own:['マスカーニャ','ルカリオ','イダイトウ'],enemy:['アシレーヌ','',''],rocks:'none',setup:'yes',leadWork:'初手の仕事',notes:'1T\n2T',review:'検証'};
   try{
     assert.equal((await fetch(url)).status,200);
+    assert.deepEqual((await(await fetch(url+'/api/records')).json()).parties,[]);
+    assert.equal((await fetch(url+'/history')).status,200);
+    assert.equal((await fetch(url+'/history.js')).status,200);
     assert.equal((await post('records',sample)).status,200);
     assert.equal((await post('records',{...sample,notes:'',review:'a'.repeat(20000)+'\n\n'+'b'.repeat(10000)})).status,200);
     assert.equal((await post('records',{...sample,review:'x'.repeat(30003)})).status,400);
@@ -108,9 +111,9 @@ test('保存・再起動・編集・重複読み込み・入力検証・削除',
     assert.equal(stored.parties.find(p=>p.id===party.id).members[4].details,'臆病 / 悪巧み');
     assert.equal((await fetch(url+'/parties')).status,200);
     assert.equal((await post('import',restored)).status,200);
-    assert.equal((await(await fetch(url+'/api/records')).json()).parties.length,2);
+    assert.equal((await(await fetch(url+'/api/records')).json()).parties.length,1);
     assert.equal((await post('delete',{id:'test-1'})).status,200);
     assert.equal((await(await fetch(url+'/api/records')).json()).records.length,1);
     assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'battles.json.bak'),'utf8')).records.length,2);
-  }finally{await new Promise(r=>server.close(r));for(const name of ['battles.json','battles.json.bak','battles.json.tmp']){const p=path.join(dir,name);if(fs.existsSync(p))fs.unlinkSync(p);}fs.rmdirSync(dir);}
+  }finally{await new Promise(r=>server.close(r));for(const name of ['battles.json','battles.json.bak','battles.json.tmp']){const p=path.join(dir,name);if(fs.existsSync(p))fs.unlinkSync(p);}const backups=path.join(dir,'backups');if(fs.existsSync(backups)){for(const name of fs.readdirSync(backups))fs.unlinkSync(path.join(backups,name));fs.rmdirSync(backups);}fs.rmdirSync(dir);}
 });

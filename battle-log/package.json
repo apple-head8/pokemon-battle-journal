@@ -5,9 +5,21 @@
   "scripts": {
     "build": "vite build",
     "start": "node server.js",
-    "test": "node --test server.test.js"
+    "test": "node --test server.test.js natures.test.js web.test.js storage.test.cjs",
+    "build:web": "vite build --outDir web-dist/build && node web-build.cjs",
+    "preview:web": "node web-preview.cjs"
   },
-  "dependencies": { "react": "^19.2.0", "react-dom": "^19.2.0" },
-  "devDependencies": { "vite": "^6.4.1" },
-  "engines": { "node": ">=20.12" }
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "vite": "^6.4.1"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "description": "ポケモン対戦記録・パーティー管理ノート",
+  "author": "apple-head8"
 }
