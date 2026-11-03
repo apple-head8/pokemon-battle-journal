@@ -130,3 +130,25 @@ test('ファイル連携：失敗時は退避、再保存で復旧、古いタ�
 
   }finally{global.structuredClone=clone;}
 });
+
+test('シーズン別パーティー戦績：旧記録・保存復元・複数シーズン・引き分け',()=>{
+  const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+  const source=fs.readFileSync(path.join(__dirname,'public/history.js'),'utf8');
+  const summarize=vm.runInNewContext('('+source.slice(source.indexOf('function summarizeSeasons('),source.indexOf('\nfunction render(){'))+')');
+  const legacy=change(empty(),'records',record);
+  assert.equal(legacy.records[0].season,'');
+  let data=change(legacy,'records',{...record,season:' シーズン7 '});
+  data=change(data,'records',{...record,id:'loss',season:'シーズン7',result:'loss'});
+  data=change(data,'records',{...record,id:'draw',season:'シーズン7',result:'draw'});
+  data=change(data,'records',{...record,id:'next',season:'シーズン8'});
+  data=change(data,'records',{...record,id:'other',season:'シーズン7',team:'別構築'});
+  data=change(data,'records',{...record,id:'old'});
+  const restored=checkFile(JSON.parse(JSON.stringify(data)));
+  const rows=JSON.parse(JSON.stringify(summarize(restored.records)));
+  assert.deepEqual(rows.find(r=>r.season==='シーズン7'&&r.team==='テスト'),{season:'シーズン7',team:'テスト',total:3,win:1,loss:1,draw:1});
+  assert.equal(rows.length,4);
+  assert.equal(rows.find(r=>r.season==='').total,1);
+  assert.equal(rows[0].season,'シーズン8');
+  assert.throws(()=>change(data,'records',{...record,season:'x'.repeat(81)}),/シーズン/);
+  assert.throws(()=>change(data,'records',{...record,season:7}),/シーズン/);
+});

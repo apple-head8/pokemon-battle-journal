@@ -113,3 +113,5 @@ html[data-theme] .battle-context{border-top-color:var(--brand-bright)}
 .page-nav a[aria-current=page]{box-shadow:inset 0 -2px var(--brand-bright),0 2px 8px #17254009}
 .stats>div:nth-child(2) strong{color:var(--brand-bright)}
 .turn-row label{background:color-mix(in srgb,var(--brand-bright) 10%,transparent)}
+
+.season-results{margin:24px 0 32px;padding:20px;border:1px solid var(--rl-border);border-radius:12px;background:var(--rl-panel)}.season-results h3{margin:0 0 10px}.season-results p{font-size:12px;line-height:1.8}.season-table-wrap{overflow-x:auto}.season-table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}.season-table th,.season-table td{padding:12px;text-align:right;border-bottom:1px solid var(--rl-border)}.season-table th:first-child,.season-table td:first-child,.season-table th:nth-child(2),.season-table td:nth-child(2){text-align:left}.season-table th{color:var(--rl-muted);font-weight:500}.filters{flex-wrap:wrap}
