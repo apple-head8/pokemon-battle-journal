@@ -8,7 +8,7 @@ function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMon
 function notice(message){$('notice').textContent=message;$('notice').classList.add('show');clearTimeout(notice.timer);notice.timer=setTimeout(()=>$('notice').classList.remove('show'),6000);}
 async function api(path,body){return window.journalAPI(path,body);}
 function getForm(){const data={id:$('recordId').value||crypto.randomUUID(),result:document.querySelector('[name=result]:checked')?.value||''};for(const key of ['team','season','date','rocks','setup','leadWork','review'])data[key]=$(key).value;for(const [key,prefix,n] of [['opponents','op',6],['own','own',3],['enemy','enemy',3]])data[key]=Array.from({length:n},(_,i)=>$(prefix+i).value);const party=activeSnapshot||parties.find(p=>p.name===data.team);if(party)data.partySnapshot=party;data.turns=readTurns();data.notes='';return data;}
-function fill(data){$('season').value=data.season||'';$('review').value=reviewText(data);setTurns(data.turns||[]);const editing=records.some(r=>r.id===data.id);$('recordId').value=data.id||'';activeSnapshot=editing?data.partySnapshot||null:null;refreshTeams(data.team,editing);for(const key of ['date','rocks','setup','leadWork'])if(data[key]!==undefined)$(key).value=data[key];for(const node of document.querySelectorAll('[name=result]'))node.checked=node.value===data.result;refreshOwn(data.team===$('team').value?data.own||['','','']:['','',''],editing);for(let i=0;i<6;i++)$('op'+i).value=data.opponents?.[i]||'';refreshEnemy(data.enemy||['','',''],true);$('formTitle').textContent=editing?'対戦を編集':'対戦を記録';}
+function fill(data){refreshSeasons(data.season||'');$('review').value=reviewText(data);setTurns(data.turns||[]);const editing=records.some(r=>r.id===data.id);$('recordId').value=data.id||'';activeSnapshot=editing?data.partySnapshot||null:null;refreshTeams(data.team,editing);for(const key of ['date','rocks','setup','leadWork'])if(data[key]!==undefined)$(key).value=data[key];for(const node of document.querySelectorAll('[name=result]'))node.checked=node.value===data.result;refreshOwn(data.team===$('team').value?data.own||['','','']:['','',''],editing);for(let i=0;i<6;i++)$('op'+i).value=data.opponents?.[i]||'';refreshEnemy(data.enemy||['','',''],true);$('formTitle').textContent=editing?'対戦を編集':'対戦を記録';}
 function draft(){try{localStorage.setItem('battle-note-draft',JSON.stringify(getForm()));}catch{}}
 function reset(){setTurns([]);const team=$('team').value,season=$('season').value;HTMLFormElement.prototype.reset.call($('battleForm'));$('season').value=season;activeSnapshot=null;refreshTeams(team);refreshOwn(['','','']);refreshEnemy(['','','']);$('date').value=today();$('recordId').value='';$('formTitle').textContent='対戦を記録';try{localStorage.removeItem('battle-note-draft');}catch{}}
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
@@ -48,7 +48,18 @@ function renderTurns(values){
 }
 $('addTurn').onclick=()=>{const values=readTurns();if(values.length>=100)return;values.push('');renderTurns(values);draft();document.querySelector('#turns .turn-row:last-child textarea').focus();};
 $('undoTurn').onclick=()=>{if(!removedTurn)return;const values=readTurns();if(values.length>=100)return notice('取り消すにはターンを1つ減らしてください。');values.splice(removedTurn.index,0,removedTurn.value);renderTurns(values);removedTurn=null;$('undoTurn').hidden=true;draft();$('addTurn').focus();};
-function render(){ $('seasonNames').replaceChildren(...[...new Set(records.map(r=>r.season).filter(Boolean))].map(name=>new Option(name,name))); $('historyCount').textContent=records.length+'戦の記録'; }
+function refreshSeasons(selected=$('season').value){
+  const names=[...new Set([...Array.from({length:12},(_,i)=>'シーズン'+(i+1)),...records.map(r=>r.season),selected].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja',{numeric:true}));
+  $('season').replaceChildren(new Option('未設定',''),...names.map(name=>new Option(name,name)));
+  $('season').value=selected;
+}
+$('addSeason').onclick=()=>{
+  const input=prompt('追加するシーズン名を入力してください（例：シーズン13）。');
+  if(input===null)return;
+  const name=input.trim();if(!name||name.length>80)return notice('シーズン名は1〜80文字で入力してください。');
+  refreshSeasons(name);draft();
+};
+function render(){ refreshSeasons(); $('historyCount').textContent=records.length+'戦の記録'; }
 function isDirty(){return Boolean(readTurns().some(v=>v.trim())||document.querySelector('[name=result]:checked')||$('leadWork').value||$('review').value||Array.from(document.querySelectorAll('.six input,.three input,.three select')).some(i=>i.value));}
 $('battleForm').addEventListener('input',draft);$('battleForm').addEventListener('change',draft);
 $('battleForm').onsubmit=async e=>{e.preventDefault();if(!ready||pending)return;const data=getForm();const own=data.own.filter(Boolean);if(new Set(own).size!==own.length)return notice('こちらの選出に同じポケモンが重複しています。');const enemy=data.enemy.filter(Boolean);if(new Set(enemy).size!==enemy.length)return notice('相手の選出に同じポケモンが重複しています。');pending=true;$('save').disabled=true;$('recordId').value=data.id;draft();try{records=(await api('records',data)).records;reset();render();notice('対戦をファイルに保存しました。');}catch(error){notice(error.message);}finally{pending=false;$('save').disabled=false;}};

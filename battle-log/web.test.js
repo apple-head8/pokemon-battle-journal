@@ -152,3 +152,18 @@ test('シーズン別パーティー戦績：旧記録・保存復元・複数�
   assert.throws(()=>change(data,'records',{...record,season:'x'.repeat(81)}),/シーズン/);
   assert.throws(()=>change(data,'records',{...record,season:7}),/シーズン/);
 });
+
+test('シーズンプルダウンは標準候補・過去の名前・編集中の名前を保持する',()=>{
+  const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+  const source=fs.readFileSync(path.join(__dirname,'public/app.js'),'utf8');
+  const select={value:'',options:[],replaceChildren(...options){this.options=options;this.value='';}};
+  const context=vm.createContext({$:()=>select,records:[{season:'大会A'},{season:'シーズン7'},{season:'大会A'}],Option:function(text,value){this.text=text;this.value=value;}});
+  vm.runInContext(source.slice(source.indexOf('function refreshSeasons('),source.indexOf("$('addSeason').onclick")),context);
+  vm.runInContext("refreshSeasons('シーズン13')",context);
+  assert.equal(select.value,'シーズン13');
+  assert.equal(select.options.filter(o=>o.value==='大会A').length,1);
+  assert.ok(select.options.some(o=>o.value==='シーズン1'));
+  assert.ok(select.options.some(o=>o.value==='シーズン12'));
+  vm.runInContext('refreshSeasons()',context);assert.equal(select.value,'シーズン13');
+  vm.runInContext("refreshSeasons('')",context);assert.equal(select.value,'');
+});
